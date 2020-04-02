@@ -201,9 +201,203 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles TIM2 global interrupt.
   */
+uint32_t BreakTime = 2000;
+uint32_t MABTime = 200;
+uint32_t DMXPacketTime = 50000;
+uint16_t Counter1;
+uint16_t Counter2;
+uint16_t Counter3;
+uint16_t Counter4;
+
+uint32_t GlobalOverflowCount;
+uint32_t MABOverflowCount;
+uint32_t BreakOverflowCount;
+
+uint8_t InitBreakFlag;
+uint8_t BreakFlag;
+uint8_t MABFlag;
+uint8_t PacketFlag;
+
+uint8_t DataCorruptFlag;
+
+void ResetPacket(void)
+{
+
+}
+
+void rising_edge(void)
+{
+	uint32_t NetCounter;
+
+	/* disable rising edge interrupt */
+	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC2);
+	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG
+
+	if (InitBreakFlag == 0)
+	{
+		Counter2 = __HAL_TIM_GET_COUNTER(&htim2); //MABRising
+		/*  MABRising - BreakFalling*/
+		NetCounter = (Counter2 - Counter1) & 0xFFFF;
+		// update value of NetCounter on the basis of GlobalOverflowCount
+		NetCounter += GlobalOverflowCount * 65535;
+
+		if (NetCounter > BreakTime) {
+			BreakFlag = 1;
+			InitBreakFlag = 1;
+			/* enable falling edge interrupt */
+			__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
+			TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_1, TIM_CCx_ENABLE);
+			__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
+			/* remember overflows at start of MAB */
+			MABOverflowCount = GlobalOverflowCount;
+			return;
+		}
+		else {
+			GlobalOverflowCount = 0;
+			return;
+		}
+	}
+
+	/* MABRising - NextBreakFalling  (All DMX Slots) */
+	NetCounter = (Counter2 - Counter4) & 0xFFFF;
+	// update value of NetCounter on the basis of BreakOverflowCount
+	NetCounter += BreakOverflowCount * 65535;
+
+	if (NetCounter <= BreakTime) {
+		DataCorruptFlag = 1;
+		return;
+	}
+
+	/* enable falling edge interrupt */
+	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
+	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
+	MABFlag = 0;
+	/* for next packet */
+	GlobalOverflowCount = GlobalOverflowCount - BreakOverflowCount;
+
+	/* NextBreakFalling - BreakFalling */
+	NetCounter = (Counter4 - Counter1) & 0xFFFF;
+	//update the valie of NetCounter on the basis of BreakOverFlowCount
+	NetCounter += BreakOverflowCount * 65535;
+
+	BreakFlag = 1;
+	InitBreakFlag = 1;
+	Counter1 = Counter4;
+
+	if (NetCounter > DMXPacketTime)
+		PacketFlag = 1;
+	else
+		ResetPacket();
+}
+
+void falling_edge(void)
+{
+	uint32_t NetCounter;
+
+	/* disable falling edge interrupt */
+	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC1);
+
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);//DEBUG.
+
+	Counter3 = __HAL_TIM_GET_COUNTER(&htim2);//StoreMABFallingCounter
+	NetCounter = (Counter3 - Counter2) & 0xFFFF; //MABFalling - MABRising
+	//Update value of NetCounter on basis og MABOverflowCount and GlobalOverflowCount
+	NetCounter += (MABOverflowCount) * 65535;
+
+	if (BreakFlag) {
+		if (NetCounter > MABTime) {
+			MABFlag = 1;
+			BreakFlag = 0;
+		}
+		else {
+			GlobalOverflowCount = 0;
+			BreakFlag = 0;
+			InitBreakFlag = 0;
+		}
+	}
+}
+
+volatile uint32_t Data;
+uint32_t DMXChannelCount;
+uint8_t Packet[512];
+
+void frame_error_handler(uint32_t Counter)
+{
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG
+
+	if ((BreakFlag == 0) && (MABFlag == 0)) {
+		/* store break failing counter */
+		Counter1 = Counter;
+	}
+	else if (MABFlag == 1) {
+		/* store NextBreakFalling counter */
+		Counter4 = Counter;
+		BreakOverflowCount = GlobalOverflowCount;
+	}
+	else
+		return;
+
+	/* enable rising edge interrupt */
+	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
+	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
+	TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_2, TIM_CCx_ENABLE);
+	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC2);
+}
+
+void uart_handler(void)
+{
+	uint32_t Counter = __HAL_TIM_GET_COUNTER(&htim2);
+	uint32_t StatusRead = huart1.Instance->SR;
+	Data = huart1.Instance->DR;
+
+	/* Frame Error interrupts happens in the middle of Break */
+	if ((StatusRead & UART_FLAG_FE) == UART_FLAG_FE) {
+		frame_error_handler(Counter);
+		return;
+	}
+
+	if ((StatusRead & UART_FLAG_RXNE) == UART_FLAG_RXNE) {
+		//HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);//DEBUG
+		if (MABFlag == 0)
+			return;
+		if (DataCorruptFlag == 1)
+			return;
+
+		if ((DMXChannelCount == 0) && (Data != 0x00)) {
+			/* first byte must be 0x00 in dmx */
+			MABFlag = 0;
+			InitBreakFlag = 0;
+			GlobalOverflowCount = 0;
+			return;
+		}
+
+		if (DMXChannelCount < 3) {
+			Packet[DMXChannelCount++] = Data;
+		}
+		else {
+			DMXChannelCount = 0;
+			//HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);//DEBUG
+		}
+	}
+}
+
+void timer_overflow(void)
+{
+	GlobalOverflowCount++;
+}
+
 void TIM2_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM2_IRQn 0 */
+  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC1)
+    falling_edge();
+
+  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC2)
+    rising_edge();
+
+  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE)
+    timer_overflow();
 
   /* USER CODE END TIM2_IRQn 0 */
   HAL_TIM_IRQHandler(&htim2);
@@ -218,11 +412,10 @@ void TIM2_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-
+  uart_handler();
   /* USER CODE END USART1_IRQn 0 */
-  HAL_UART_IRQHandler(&huart1);
+  //HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-
   /* USER CODE END USART1_IRQn 1 */
 }
 

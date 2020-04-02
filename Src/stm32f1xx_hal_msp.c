@@ -108,9 +108,11 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+//TIM2->DIER &= ~(TIM_IT_CC1 | TIM_IT_CC2);
+//TIM2->SR = ~(TIM_IT_CC1 | TIM_IT_CC2);
     /* TIM2 interrupt Init */
-    HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+//    HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
+//    HAL_NVIC_EnableIRQ(TIM2_IRQn);
   /* USER CODE BEGIN TIM2_MspInit 1 */
 
   /* USER CODE END TIM2_MspInit 1 */
