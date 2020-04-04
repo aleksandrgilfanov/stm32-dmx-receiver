@@ -201,6 +201,8 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles TIM2 global interrupt.
   */
+#define TIMER_PERIOD 65535
+
 uint32_t BreakTime = 2000;
 uint32_t MABTime = 200;
 uint32_t DMXPacketTime = 50000;
@@ -229,18 +231,26 @@ void rising_edge(void)
 {
 	uint32_t NetCounter;
 
+	/* it is rising edge __/ . It is end of Break and start of MAB  */
+
 	/* disable rising edge interrupt */
 	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC2);
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
+
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG
 
+	/* Beginning of the packet */
 	if (InitBreakFlag == 0)
 	{
-		Counter2 = __HAL_TIM_GET_COUNTER(&htim2); //MABRising
-		/*  MABRising - BreakFalling*/
-		NetCounter = (Counter2 - Counter1) & 0xFFFF;
-		// update value of NetCounter on the basis of GlobalOverflowCount
-		NetCounter += GlobalOverflowCount * 65535;
+		/* Store MAB Rising Edge Counter */
+		Counter2 = __HAL_TIM_GET_COUNTER(&htim2);
+		/* Calculate BreakTime = MABRising - BreakFalling */
+		NetCounter = (Counter2 - Counter1) & TIMER_PERIOD;
+		/*
+		 * Timer counter maximum value is 65535. Each overflow it
+		 * increases GlobalOverflowCount, so global total time is:
+		 */
+		NetCounter += GlobalOverflowCount * TIMER_PERIOD;
 
 		if (NetCounter > BreakTime) {
 			BreakFlag = 1;
@@ -251,18 +261,25 @@ void rising_edge(void)
 			__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
 			/* remember overflows at start of MAB */
 			MABOverflowCount = GlobalOverflowCount;
-			return;
 		}
 		else {
+			/*
+			 * Break is too short for correct DMX packet. So, edge
+			 * interrupts are disabled now. Rising edge handler will
+			 * be enabled again only after UART FE interrupt.
+			 */
+			
 			GlobalOverflowCount = 0;
-			return;
 		}
+
+		return;
 	}
 
-	/* MABRising - NextBreakFalling  (All DMX Slots) */
-	NetCounter = (Counter2 - Counter4) & 0xFFFF;
+	/* It is end of Next Break */
+	/* MABRising - NextBreakFalling */
+	NetCounter = (Counter2 - Counter4) & TIMER_PERIOD;
 	// update value of NetCounter on the basis of BreakOverflowCount
-	NetCounter += BreakOverflowCount * 65535;
+	NetCounter += BreakOverflowCount * TIMER_PERIOD;
 
 	if (NetCounter <= BreakTime) {
 		DataCorruptFlag = 1;
@@ -285,9 +302,11 @@ void rising_edge(void)
 	InitBreakFlag = 1;
 	Counter1 = Counter4;
 
+	/* check that length of packet more than minimum */
 	if (NetCounter > DMXPacketTime)
 		PacketFlag = 1;
 	else
+		/* drop whole packet if length*/
 		ResetPacket();
 }
 
@@ -301,9 +320,9 @@ void falling_edge(void)
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);//DEBUG.
 
 	Counter3 = __HAL_TIM_GET_COUNTER(&htim2);//StoreMABFallingCounter
-	NetCounter = (Counter3 - Counter2) & 0xFFFF; //MABFalling - MABRising
+	NetCounter = (Counter3 - Counter2) & TIMER_PERIOD; //MABFalling - MABRising
 	//Update value of NetCounter on basis og MABOverflowCount and GlobalOverflowCount
-	NetCounter += (MABOverflowCount) * 65535;
+	NetCounter += (MABOverflowCount) * TIMER_PERIOD;
 
 	if (BreakFlag) {
 		if (NetCounter > MABTime) {
@@ -327,12 +346,13 @@ void frame_error_handler(uint32_t Counter)
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG
 
 	if ((BreakFlag == 0) && (MABFlag == 0)) {
-		/* store break failing counter */
+		/* Store Break start counter */
 		Counter1 = Counter;
 	}
 	else if (MABFlag == 1) {
-		/* store NextBreakFalling counter */
+		/* It is next Break, store NextBreakStart counter */
 		Counter4 = Counter;
+		/* Store, it will be used in ? */
 		BreakOverflowCount = GlobalOverflowCount;
 	}
 	else
@@ -351,7 +371,8 @@ void uart_handler(void)
 	uint32_t StatusRead = huart1.Instance->SR;
 	Data = huart1.Instance->DR;
 
-	/* Frame Error interrupts happens in the middle of Break */
+	/* Frame Error interrupt happens after 10 bits of 0 (~40us), so it is
+	 * after first 40 us of Break */
 	if ((StatusRead & UART_FLAG_FE) == UART_FLAG_FE) {
 		frame_error_handler(Counter);
 		return;
