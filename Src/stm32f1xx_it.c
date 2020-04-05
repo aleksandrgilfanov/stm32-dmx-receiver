@@ -236,7 +236,6 @@ void rising_edge(void)
 
 	/* Disable rising edge interrupt */
 	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC2);
-	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
 
 	/* Beginning of the packet */
 	if (InitBreakFlag == 0)
@@ -255,7 +254,6 @@ void rising_edge(void)
 			InitBreakFlag = 1;
 
 			/* Enable falling edge interrupt */
-			__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
 			__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
 
 			/* Remember overflows at start of MAB */
@@ -286,7 +284,6 @@ void rising_edge(void)
 	}
 
 	/* Enable falling edge interrupt */
-	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
 	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
 	/* Reset old MAB flag, falling edge interrupt will set it if found */
 	MABFlag = 0;
