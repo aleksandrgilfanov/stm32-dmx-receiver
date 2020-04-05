@@ -201,7 +201,8 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles TIM2 global interrupt.
   */
-#define TIMER_PERIOD 65535
+#define TIMER_PERIOD 	0xFFFF
+#define DMX_MAX_SLOTS 	512
 
 uint32_t BreakTime = 2000;
 uint32_t MABTime = 200;
@@ -219,48 +220,46 @@ uint8_t InitBreakFlag;
 uint8_t BreakFlag;
 uint8_t MABFlag;
 uint8_t PacketFlag;
-
 uint8_t DataCorruptFlag;
 
-void ResetPacket(void)
-{
+uint32_t DMXChannelCount;
+uint8_t Packet[512];
 
-}
-
+/* It is rising edge __/ . It is end of Break and start of MAB  */
 void rising_edge(void)
 {
 	uint32_t NetCounter;
+	uint32_t OverflowCount = GlobalOverflowCount;
 
-	/* it is rising edge __/ . It is end of Break and start of MAB  */
+	/* Store MAB Rising Edge Counter */
+	Counter2 = __HAL_TIM_GET_COUNTER(&htim2);
 
-	/* disable rising edge interrupt */
+	/* Disable rising edge interrupt */
 	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC2);
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
-
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG
 
 	/* Beginning of the packet */
 	if (InitBreakFlag == 0)
 	{
-		/* Store MAB Rising Edge Counter */
-		Counter2 = __HAL_TIM_GET_COUNTER(&htim2);
 		/* Calculate BreakTime = MABRising - BreakFalling */
 		NetCounter = (Counter2 - Counter1) & TIMER_PERIOD;
 		/*
 		 * Timer counter maximum value is 65535. Each overflow it
 		 * increases GlobalOverflowCount, so global total time is:
 		 */
-		NetCounter += GlobalOverflowCount * TIMER_PERIOD;
+		NetCounter += OverflowCount * TIMER_PERIOD;
 
 		if (NetCounter > BreakTime) {
+			/* Set flags that Break is detected */
 			BreakFlag = 1;
 			InitBreakFlag = 1;
-			/* enable falling edge interrupt */
+
+			/* Enable falling edge interrupt */
 			__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
-			TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_1, TIM_CCx_ENABLE);
 			__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
-			/* remember overflows at start of MAB */
-			MABOverflowCount = GlobalOverflowCount;
+
+			/* Remember overflows at start of MAB */
+			MABOverflowCount = OverflowCount;
 		}
 		else {
 			/*
@@ -268,7 +267,6 @@ void rising_edge(void)
 			 * interrupts are disabled now. Rising edge handler will
 			 * be enabled again only after UART FE interrupt.
 			 */
-			
 			GlobalOverflowCount = 0;
 		}
 
@@ -278,129 +276,148 @@ void rising_edge(void)
 	/* It is end of Next Break */
 	/* MABRising - NextBreakFalling */
 	NetCounter = (Counter2 - Counter4) & TIMER_PERIOD;
-	// update value of NetCounter on the basis of BreakOverflowCount
-	NetCounter += BreakOverflowCount * TIMER_PERIOD;
+	/* with regard to GlobalOverflowCount and BreakOverflowCount  */
+	NetCounter += (OverflowCount - BreakOverflowCount) * TIMER_PERIOD;
 
+	/* If Break is too short */
 	if (NetCounter <= BreakTime) {
 		DataCorruptFlag = 1;
 		return;
 	}
 
-	/* enable falling edge interrupt */
+	/* Enable falling edge interrupt */
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
 	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
+	/* Reset old MAB flag, falling edge interrupt will set it if found */
 	MABFlag = 0;
-	/* for next packet */
+	/* For next packet */
 	GlobalOverflowCount = GlobalOverflowCount - BreakOverflowCount;
 
-	/* NextBreakFalling - BreakFalling */
-	NetCounter = (Counter4 - Counter1) & 0xFFFF;
-	//update the valie of NetCounter on the basis of BreakOverFlowCount
-	NetCounter += BreakOverflowCount * 65535;
+	/* Calculate time between Breaks = NextBreakFalling - BreakFalling */
+	NetCounter = (Counter4 - Counter1) & TIMER_PERIOD;
+	/* Total time beetween Breaks */
+	NetCounter += BreakOverflowCount * TIMER_PERIOD;
 
 	BreakFlag = 1;
 	InitBreakFlag = 1;
 	Counter1 = Counter4;
 
-	/* check that length of packet more than minimum */
-	if (NetCounter > DMXPacketTime)
+	/* If Break to Break time is correct set flag */
+	if (NetCounter > DMXPacketTime) {
+		/* Set Flag that Packet is ready */
 		PacketFlag = 1;
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG.
+	}
 	else
-		/* drop whole packet if length*/
-		ResetPacket();
+		PacketFlag = 0;
 }
 
+/* Falling edge is end of MAB */
 void falling_edge(void)
 {
 	uint32_t NetCounter;
+	uint32_t OverflowCount = GlobalOverflowCount;
 
-	/* disable falling edge interrupt */
+	/* Disable falling edge interrupt */
 	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC1);
 
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);//DEBUG.
+	/* It is MAB Falling edge, so store MAB End counter value */
+	Counter3 = __HAL_TIM_GET_COUNTER(&htim2);
 
-	Counter3 = __HAL_TIM_GET_COUNTER(&htim2);//StoreMABFallingCounter
-	NetCounter = (Counter3 - Counter2) & TIMER_PERIOD; //MABFalling - MABRising
-	//Update value of NetCounter on basis og MABOverflowCount and GlobalOverflowCount
-	NetCounter += (MABOverflowCount) * TIMER_PERIOD;
+	/* Calculate MAB Time = MABFalling - MABRising */
+	NetCounter = (Counter3 - Counter2) & TIMER_PERIOD;
+	/* Total time */
+	NetCounter += (OverflowCount - MABOverflowCount) * TIMER_PERIOD;
 
-	if (BreakFlag) {
-		if (NetCounter > MABTime) {
-			MABFlag = 1;
-			BreakFlag = 0;
-		}
-		else {
-			GlobalOverflowCount = 0;
-			BreakFlag = 0;
-			InitBreakFlag = 0;
-		}
+	/* Return if correct Break was not detected previously */
+	if (BreakFlag == 0)
+		return;
+
+	if (NetCounter > MABTime) {
+		/* Got correct MAB, ready to receive slots */
+		MABFlag = 1;
+		BreakFlag = 0;
+	}
+	else {
+		/* Too short MAB, so clear and wait for new Break (UART FE) */
+		GlobalOverflowCount = 0;
+		BreakFlag = 0;
+		InitBreakFlag = 0;
 	}
 }
 
-volatile uint32_t Data;
-uint32_t DMXChannelCount;
-uint8_t Packet[512];
-
+/* Frame Error is detected by UART after 10bits of low level. So it is Break */
 void frame_error_handler(uint32_t Counter)
 {
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG
+	/* actually FE is 40 usec after Break start... */
 
 	if ((BreakFlag == 0) && (MABFlag == 0)) {
-		/* Store Break start counter */
+		/* Store first Break start counter */
 		Counter1 = Counter;
 	}
 	else if (MABFlag == 1) {
 		/* It is next Break, store NextBreakStart counter */
 		Counter4 = Counter;
-		/* Store, it will be used in ? */
+		/* Store Overflows, it will be used to calculate time between Breaks */
 		BreakOverflowCount = GlobalOverflowCount;
 	}
 	else
 		return;
 
-	/* enable rising edge interrupt */
+	/* Enable rising edge interrupt, to detect Break End */
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
-	TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_2, TIM_CCx_ENABLE);
 	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC2);
+}
+
+void receive_data_handler(uint32_t Data)
+{
+	/* Do not receice data without correct MAB */
+	if (MABFlag == 0)
+		return;
+	/*
+	 * MABFlag is still set at second MAB. So, MAB Falling interrupt
+	 * sets DataCorruptFlag if second MAB is too short
+	 */
+	if (DataCorruptFlag == 1)
+		return;
+
+	/* Drop packet if first byte is not 0x00 */
+	if ((DMXChannelCount == 0) && (Data != 0x00)) {
+		MABFlag = 0;
+		InitBreakFlag = 0;
+		GlobalOverflowCount = 0;
+		return;
+	}
+
+	/* Save slot data into Packet while */
+	if (DMXChannelCount < DMX_MAX_SLOTS)
+		Packet[DMXChannelCount++] = Data;
+	/* Or drop all packet if it is too long */
+	else 
+		DMXChannelCount = 0;
 }
 
 void uart_handler(void)
 {
 	uint32_t Counter = __HAL_TIM_GET_COUNTER(&htim2);
 	uint32_t StatusRead = huart1.Instance->SR;
-	Data = huart1.Instance->DR;
+	uint32_t Data = huart1.Instance->DR;
 
 	/* Frame Error interrupt happens after 10 bits of 0 (~40us), so it is
 	 * after first 40 us of Break */
 	if ((StatusRead & UART_FLAG_FE) == UART_FLAG_FE) {
 		frame_error_handler(Counter);
+		__HAL_UART_CLEAR_FLAG(&huart1, UART_FLAG_FE);
 		return;
 	}
 
+	/* Receive Data interrupt */
 	if ((StatusRead & UART_FLAG_RXNE) == UART_FLAG_RXNE) {
-		//HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);//DEBUG
-		if (MABFlag == 0)
-			return;
-		if (DataCorruptFlag == 1)
-			return;
-
-		if ((DMXChannelCount == 0) && (Data != 0x00)) {
-			/* first byte must be 0x00 in dmx */
-			MABFlag = 0;
-			InitBreakFlag = 0;
-			GlobalOverflowCount = 0;
-			return;
-		}
-
-		if (DMXChannelCount < 3) {
-			Packet[DMXChannelCount++] = Data;
-		}
-		else {
-			DMXChannelCount = 0;
-			//HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);//DEBUG
-		}
+		receive_data_handler(Data);
+		//__HAL_UART_CLEAR_FLAG(&huart1, UART_FLAG_RXNE);
 	}
+	__HAL_UART_CLEAR_PEFLAG(&huart1);
 }
 
 void timer_overflow(void)
@@ -410,15 +427,15 @@ void timer_overflow(void)
 
 void TIM2_IRQHandler(void)
 {
+  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE)
+    timer_overflow();
+
   /* USER CODE BEGIN TIM2_IRQn 0 */
   if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC1)
     falling_edge();
 
   if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC2)
     rising_edge();
-
-  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE)
-    timer_overflow();
 
   /* USER CODE END TIM2_IRQn 0 */
   HAL_TIM_IRQHandler(&htim2);

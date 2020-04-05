@@ -20,6 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,7 +47,8 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+extern uint8_t PacketFlag;
+extern uint8_t Packet[];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -92,7 +94,6 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
@@ -106,7 +107,15 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	if (PacketFlag == 1)
+	{
+		uint8_t packet[512];
 
+		memcpy(packet, Packet, 512);
+		PacketFlag = 0;
+		if (packet[0] == 0x00)
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+	}
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -211,10 +220,14 @@ __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC2);
   __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
   //HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
   //HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
+TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_1, TIM_CCx_ENABLE);
+TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_2, TIM_CCx_ENABLE);
+
   __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC1);
   __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC2);
   __HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
   __HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
+  __HAL_TIM_ENABLE(&htim2);
   HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(TIM2_IRQn);
 
