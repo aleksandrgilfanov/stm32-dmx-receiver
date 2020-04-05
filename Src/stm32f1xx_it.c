@@ -427,18 +427,28 @@ void timer_overflow(void)
 
 void TIM2_IRQHandler(void)
 {
-  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE)
+  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) {
     timer_overflow();
+    __HAL_TIM_CLEAR_IT(&htim2, TIM_FLAG_UPDATE);
+  }
 
   /* USER CODE BEGIN TIM2_IRQn 0 */
-  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC1)
-    falling_edge();
+  if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC1) != RESET)
+    if (__HAL_TIM_GET_IT_SOURCE(&htim2, TIM_IT_CC1) != RESET)
+    {
+      falling_edge();
+      __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_CC1);
+    }
 
-  if __HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC2)
-    rising_edge();
+  if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC2) != RESET)
+    if (__HAL_TIM_GET_IT_SOURCE(&htim2, TIM_IT_CC2) != RESET)
+    {
+      rising_edge();
+      __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_CC2);
+    }
 
   /* USER CODE END TIM2_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim2);
+  //HAL_TIM_IRQHandler(&htim2);
   /* USER CODE BEGIN TIM2_IRQn 1 */
 
   /* USER CODE END TIM2_IRQn 1 */
