@@ -405,16 +405,15 @@ void uart_handler(void)
 	 * after first 40 us of Break */
 	if ((StatusRead & UART_FLAG_FE) == UART_FLAG_FE) {
 		frame_error_handler(Counter);
-		__HAL_UART_CLEAR_FLAG(&huart1, UART_FLAG_FE);
+		__HAL_UART_CLEAR_FEFLAG(&huart1);
 		return;
 	}
 
 	/* Receive Data interrupt */
 	if ((StatusRead & UART_FLAG_RXNE) == UART_FLAG_RXNE) {
 		receive_data_handler(Data);
-		//__HAL_UART_CLEAR_FLAG(&huart1, UART_FLAG_RXNE);
+		__HAL_UART_CLEAR_FLAG(&huart1, UART_FLAG_RXNE);
 	}
-	__HAL_UART_CLEAR_PEFLAG(&huart1);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
