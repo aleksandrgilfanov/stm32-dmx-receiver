@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdbool.h>
 #include "main.h"
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
@@ -225,53 +226,43 @@ uint8_t DataCorruptFlag;
 uint32_t DMXChannelCount;
 uint8_t Packet[512];
 
-/* It is rising edge __/ . It is end of Break and start of MAB  */
-void rising_edge(void)
+static void first_break_rising(uint32_t OverflowCount)
 {
 	uint32_t NetCounter;
-	uint32_t OverflowCount = GlobalOverflowCount;
 
-	/* Store MAB Rising Edge Counter */
-	Counter2 = __HAL_TIM_GET_COUNTER(&htim2);
+	/* Calculate BreakTime = MABRising - BreakFalling */
+	NetCounter = (Counter2 - Counter1) & TIMER_PERIOD;
+	/*
+	 * Timer counter maximum value is 65535. Each overflow it
+	 * increases GlobalOverflowCount, so global total time is:
+	 */
+	NetCounter += OverflowCount * TIMER_PERIOD;
 
-	/* Disable rising edge interrupt */
-	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC2);
+	if (NetCounter > BreakTime) {
+		/* Set flags that Break is detected */
+		BreakFlag = 1;
+		InitBreakFlag = 1;
 
-	/* Beginning of the packet */
-	if (InitBreakFlag == 0)
-	{
-		/* Calculate BreakTime = MABRising - BreakFalling */
-		NetCounter = (Counter2 - Counter1) & TIMER_PERIOD;
-		/*
-		 * Timer counter maximum value is 65535. Each overflow it
-		 * increases GlobalOverflowCount, so global total time is:
-		 */
-		NetCounter += OverflowCount * TIMER_PERIOD;
+		/* Enable falling edge interrupt */
+		__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
 
-		if (NetCounter > BreakTime) {
-			/* Set flags that Break is detected */
-			BreakFlag = 1;
-			InitBreakFlag = 1;
-
-			/* Enable falling edge interrupt */
-			__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
-
-			/* Remember overflows at start of MAB */
-			MABOverflowCount = OverflowCount;
-		}
-		else {
-			/*
-			 * Break is too short for correct DMX packet. So, edge
-			 * interrupts are disabled now. Rising edge handler will
-			 * be enabled again only after UART FE interrupt.
-			 */
-			GlobalOverflowCount = 0;
-		}
-
-		return;
+		/* Remember overflows at start of MAB */
+		MABOverflowCount = OverflowCount;
 	}
+	else {
+		/*
+		 * Break is too short for correct DMX packet. So, edge
+		 * interrupts are disabled now. Rising edge handler will
+		 * be enabled again only after UART FE interrupt.
+		 */
+		GlobalOverflowCount = 0;
+	}
+}
 
-	/* It is end of Next Break */
+static bool next_break_rising(uint32_t OverflowCount)
+{
+	uint32_t NetCounter;
+
 	/* MABRising - NextBreakFalling */
 	NetCounter = (Counter2 - Counter4) & TIMER_PERIOD;
 	/* with regard to GlobalOverflowCount and BreakOverflowCount  */
@@ -280,7 +271,7 @@ void rising_edge(void)
 	/* If Break is too short */
 	if (NetCounter <= BreakTime) {
 		DataCorruptFlag = 1;
-		return;
+		return false;
 	}
 
 	/* Enable falling edge interrupt */
@@ -300,13 +291,45 @@ void rising_edge(void)
 	Counter1 = Counter4;
 
 	/* If Break to Break time is correct set flag */
-	if (NetCounter > DMXPacketTime) {
+	if (NetCounter < DMXPacketTime)
+		return false;
+
+	return true;
+}
+
+/* It is rising edge __/ . It is end of Break and start of MAB  */
+void rising_edge(void)
+{
+	uint32_t OverflowCount = GlobalOverflowCount;
+
+	/* Store MAB Rising Edge Counter */
+	Counter2 = __HAL_TIM_GET_COUNTER(&htim2);
+
+	/* Disable rising edge interrupt */
+	__HAL_TIM_DISABLE_IT(&htim2, TIM_FLAG_CC2);
+
+	/* No Breaks received yet, it is first */
+	if (InitBreakFlag == 0)
+	{
+		/* Check First Break time etc. */
+		first_break_rising(OverflowCount);
+		return;
+	}
+
+	/*
+	 * Check Next Break time, then check Break to Break. If it is correct,
+	 * then previous received packet can be used
+         */
+	if (next_break_rising(OverflowCount))
+	{
 		/* Set Flag that Packet is ready */
 		PacketFlag = 1;
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG.
 	}
-	else
+	else {
+		/* Ignore previously received packed */
 		PacketFlag = 0;
+	}
 }
 
 /* Falling edge is end of MAB */
