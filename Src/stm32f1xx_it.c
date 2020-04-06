@@ -220,11 +220,17 @@ uint32_t BreakOverflowCount;
 uint8_t InitBreakFlag;
 uint8_t BreakFlag;
 uint8_t MABFlag;
-uint8_t PacketFlag;
 uint8_t DataCorruptFlag;
 
-uint32_t DMXChannelCount;
-uint8_t Packet[512];
+/* Packet byte counter, used while receiving is still in process */
+uint16_t DMXChannelCount;
+
+/* DMX Packet buffer with one byte for first 0x00 */
+uint8_t Packet[DMX_MAX_SLOTS + 1];
+/* Flag that indicates succesfully received packet */
+uint8_t PacketFlag;
+/* Length of received packet */
+uint16_t PacketLength;
 
 static void first_break_rising(uint32_t OverflowCount)
 {
@@ -327,8 +333,8 @@ void rising_edge(void)
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG.
 	}
 	else {
-		/* Ignore previously received packed */
-		PacketFlag = 0;
+		/* Ignore previously received packet */
+		PacketLength = 0;
 	}
 }
 
@@ -384,6 +390,14 @@ void frame_error_handler(uint32_t Counter)
 	else
 		return;
 
+	/*
+	 * Save already received packet length, but it must be used only when
+	 * PacketFlag will be set (after checking Break time)
+	 */
+	PacketLength = DMXChannelCount;
+	/* Prepare counter for receiving slots of next packet */
+	DMXChannelCount = 0;
+
 	/* Enable rising edge interrupt, to detect Break End */
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
 	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
@@ -410,12 +424,14 @@ void receive_data_handler(uint32_t Data)
 		return;
 	}
 
-	/* Save slot data into Packet while */
-	if (DMXChannelCount < DMX_MAX_SLOTS)
-		Packet[DMXChannelCount++] = Data;
-	/* Or drop all packet if it is too long */
-	else 
+	/* Drop all packet if it is too long */
+	if (DMXChannelCount > DMX_MAX_SLOTS) {
 		DMXChannelCount = 0;
+		return;
+	}
+
+	/* Save slot data into Packet while */
+	Packet[DMXChannelCount++] = Data;
 }
 
 void uart_handler(void)

@@ -47,8 +47,9 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-extern uint8_t PacketFlag;
 extern uint8_t Packet[];
+extern uint8_t PacketFlag;
+extern uint16_t PacketLength;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,10 +110,13 @@ int main(void)
     /* USER CODE END WHILE */
 	if (PacketFlag == 1)
 	{
-		uint8_t packet[512];
+		uint8_t packet[513];
+		uint16_t slots;
 
-		memcpy(packet, Packet, 512);
+		slots = PacketLength;
+		memcpy(packet, Packet, slots);
 		PacketFlag = 0;
+
 		if (packet[0] == 0x00)
 			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
 	}
