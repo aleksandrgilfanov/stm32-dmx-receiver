@@ -19,8 +19,13 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
+#include "string.h"
+#include "stdarg.h"
+#include "stdio.h"
+
 #include "main.h"
 #include "usb_device.h"
+#include "usbd_cdc_if.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -63,7 +68,20 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+char usb_buf[512];
+static void usb_printf(char *fmt, ...)
+{
+	uint16_t len;
+	va_list ap;
 
+	va_start(ap, fmt);
+	vsprintf(usb_buf, fmt, ap);
+	va_end(ap);
+
+	len = strlen(usb_buf);
+
+	CDC_Transmit_FS((uint8_t*)usb_buf, len);
+}
 /* USER CODE END 0 */
 
 /**
@@ -112,14 +130,16 @@ int main(void)
 	if (PacketFlag == 1)
 	{
 		uint8_t packet[513];
-		uint16_t slots;
+		uint16_t len;
 
-		slots = PacketLength;
-		memcpy(packet, Packet, slots);
+		len = PacketLength;
+		memcpy(packet, Packet, len);
 		PacketFlag = 0;
 
 		if (packet[0] == 0x00)
 			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+
+		usb_printf("[%u] Received packet: len=%d\r\n", HAL_GetTick(), len);
 	}
     /* USER CODE BEGIN 3 */
   }
