@@ -68,7 +68,9 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-char usb_buf[512];
+static char usb_buf[512];
+static uint8_t packet[576];
+
 static void usb_printf(char *fmt, ...)
 {
 	uint16_t len;
@@ -82,6 +84,35 @@ static void usb_printf(char *fmt, ...)
 
 	CDC_Transmit_FS((uint8_t*)usb_buf, len);
 }
+
+void usb_dumppacket(uint8_t *src_packet, uint16_t len)
+{
+	char *ptr = usb_buf;
+	uint16_t to_send;
+
+	ptr += sprintf(ptr, "[%lu] Dumping packet (type=%02X len=%d):",
+		       HAL_GetTick(), src_packet[0], len);
+
+	for (int i = 1; i < len; i++) {
+		if ((i % 16) == 1)
+			ptr += sprintf(ptr, "\r\n");
+
+		ptr += sprintf(ptr, "%02X ", src_packet[i]);
+
+		to_send = ptr - usb_buf;
+		if (to_send > 500)
+		{
+			CDC_Transmit_FS((uint8_t*)usb_buf, to_send);
+			ptr = usb_buf;
+		}
+	}
+
+	ptr += sprintf(ptr, "\r\n");
+
+	to_send = ptr - usb_buf;
+	CDC_Transmit_FS((uint8_t*)usb_buf, to_send);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -117,7 +148,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-
+   usb_printf("DMX receiver started\r\n");
   /* USER CODE END 2 */
  
  
@@ -129,18 +160,16 @@ int main(void)
     /* USER CODE END WHILE */
 	if (PacketFlag == 1)
 	{
-		uint8_t packet[513];
 		uint16_t len;
 
 		len = PacketLength;
 		memcpy(packet, Packet, len);
 		PacketFlag = 0;
 
-		if (packet[0] == 0x00)
-			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		usb_dumppacket(packet, len);
 
-		usb_printf("[%u] Received packet: len=%d\r\n", HAL_GetTick(), len);
 	}
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
