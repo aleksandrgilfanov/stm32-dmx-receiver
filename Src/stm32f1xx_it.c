@@ -426,7 +426,7 @@ void receive_data_handler(uint32_t Data)
 	}
 
 	/* Drop all packet if it is too long */
-	if (DMXChannelCount > DMX_MAX_SLOTS) {
+	if (DMXChannelCount > (DMX_MAX_SLOTS + 1)) {
 		DMXChannelCount = 0;
 		return;
 	}
