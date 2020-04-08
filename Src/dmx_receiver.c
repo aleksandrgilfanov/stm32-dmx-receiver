@@ -1,7 +1,10 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "main.h"
+#include "stm32f1xx_hal.h"
+#include "stm32f1xx_hal_tim.h"
+#include "stm32f1xx_hal_uart.h"
+
 #include "dmx_receiver.h"
 
 #define TIMER_PERIOD 	0xFFFF
@@ -149,7 +152,6 @@ static void rising_edge(void)
 	{
 		/* Set Flag that Packet is ready */
 		PacketFlag = 1;
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);//DEBUG.
 	}
 	else {
 		/* Ignore previously received packet */
