@@ -24,6 +24,7 @@
 #include "stdio.h"
 
 #include "main.h"
+#include "dmx_receiver.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
 
@@ -52,9 +53,7 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-extern uint8_t Packet[];
-extern uint8_t PacketFlag;
-extern uint16_t PacketLength;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -158,17 +157,12 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	if (PacketFlag == 1)
-	{
-		uint16_t len;
+	uint16_t len;
 
-		len = PacketLength;
-		memcpy(packet, Packet, len);
-		PacketFlag = 0;
+	len = dmx_receive(packet);
 
-		usb_dumppacket(packet, len);
+	usb_dumppacket(packet, len);
 
-	}
 
     /* USER CODE BEGIN 3 */
   }
