@@ -9,32 +9,33 @@
 
 extern TIM_HandleTypeDef htim2;
 
-uint32_t BreakTime = 2000;
-uint32_t MABTime = 200;
-uint32_t DMXPacketTime = 50000;
-uint16_t Counter1;
-uint16_t Counter2;
-uint16_t Counter3;
-uint16_t Counter4;
+static uint32_t BreakTime = 2000;
+static uint32_t MABTime = 200;
+static uint32_t DMXPacketTime = 50000;
 
-uint32_t GlobalOverflowCount;
-uint32_t MABOverflowCount;
-uint32_t BreakOverflowCount;
+static uint16_t Counter1;
+static uint16_t Counter2;
+static uint16_t Counter3;
+static uint16_t Counter4;
 
-uint8_t InitBreakFlag;
-uint8_t BreakFlag;
-uint8_t MABFlag;
-uint8_t DataCorruptFlag;
+static uint32_t GlobalOverflowCount;
+static uint32_t MABOverflowCount;
+static uint32_t BreakOverflowCount;
+
+static uint8_t InitBreakFlag;
+static uint8_t BreakFlag;
+static uint8_t MABFlag;
+static uint8_t DataCorruptFlag;
 
 /* Packet byte counter, used while receiving is still in process */
-uint16_t DMXChannelCount;
+static uint16_t DMXChannelCount;
 
 /* DMX Packet buffer with one byte for first 0x00 */
-uint8_t Packet[DMX_MAX_SLOTS + 1];
+static uint8_t Packet[DMX_MAX_SLOTS + 1];
 /* Flag that indicates succesfully received packet */
-uint8_t PacketFlag;
+static uint8_t PacketFlag;
 /* Length of received packet */
-uint16_t PacketLength;
+static uint16_t PacketLength;
 
 /* Blocking receive entire DMX packet */
 uint16_t dmx_receive(uint8_t* dest)
@@ -122,7 +123,7 @@ static bool next_break_rising(uint32_t OverflowCount)
 }
 
 /* It is rising edge __/ . It is end of Break and start of MAB  */
-void rising_edge(void)
+static void rising_edge(void)
 {
 	uint32_t OverflowCount = GlobalOverflowCount;
 
@@ -157,7 +158,7 @@ void rising_edge(void)
 }
 
 /* Falling edge is end of MAB */
-void falling_edge(void)
+static void falling_edge(void)
 {
 	uint32_t NetCounter;
 	uint32_t OverflowCount = GlobalOverflowCount;
@@ -191,7 +192,7 @@ void falling_edge(void)
 }
 
 /* Frame Error is detected by UART after 10bits of low level. So it is Break */
-void frame_error_handler(uint32_t Counter)
+static void frame_error_handler(uint32_t Counter)
 {
 	/* actually FE is 40 usec after Break start... */
 
@@ -222,7 +223,7 @@ void frame_error_handler(uint32_t Counter)
 	__HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC2);
 }
 
-void receive_data_handler(uint32_t Data)
+static void receive_data_handler(uint32_t Data)
 {
 	/* Do not receice data without correct MAB */
 	if (MABFlag == 0)
