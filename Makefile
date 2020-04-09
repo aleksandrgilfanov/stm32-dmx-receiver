@@ -37,6 +37,7 @@ BUILD_DIR = build
 # C sources
 C_SOURCES =  \
 Src/main.c \
+Src/adc.c \
 Src/dmx_receiver.c \
 Src/usb_debug.c \
 Src/stm32f1xx_it.c \

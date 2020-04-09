@@ -20,6 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
 #include "dmx_receiver.h"
 #include "usb_debug.h"
 #include "usb_device.h"
@@ -104,6 +105,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
+  adc_init(&hadc1);
    usb_printf("DMX receiver started\r\n");
   /* USER CODE END 2 */
  
