@@ -82,7 +82,6 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -107,33 +106,30 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USB_DEVICE_Init();
   MX_ADC1_Init();
+
   /* USER CODE BEGIN 2 */
   if (!adc_init(&hadc1, ADC_CHANNELS))
-    Error_Handler(); 
+    Error_Handler();
 
-   usb_printf("DMX receiver started\r\n");
+  usb_printf("DMX receiver started\r\n");
   /* USER CODE END 2 */
- 
- 
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-	uint16_t len;
-	uint16_t adc[ADC_CHANNELS];
-	uint8_t adc_error;
+    uint16_t len;
+    uint16_t adc[ADC_CHANNELS];
+    uint8_t adc_error;
 
-	len = dmx_receive(packet);
+    len = dmx_receive(packet);
 
-	//usb_dumppacket(packet, len);
+    //usb_dumppacket(packet, len);
 
-	adc_get(adc, &adc_error);
-	usb_printf("DMX.Len=%d ADC1=%d ADC2=%d ADC_Error=%d\r\n",
-		   len, adc[0], adc[1], adc_error);
-
-
+    adc_get(adc, &adc_error);
+    usb_printf("DMX.Len=%d ADC1=%d ADC2=%d ADC_Error=%d\r\n",
+                len, adc[0], adc[1], adc_error);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -191,7 +187,6 @@ void SystemClock_Config(void)
   */
 static void MX_ADC1_Init(void)
 {
-
   /* USER CODE BEGIN ADC1_Init 0 */
 
   /* USER CODE END ADC1_Init 0 */
@@ -234,7 +229,6 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -244,7 +238,6 @@ static void MX_ADC1_Init(void)
   */
 static void MX_TIM2_Init(void)
 {
-
   /* USER CODE BEGIN TIM2_Init 0 */
 
   /* USER CODE END TIM2_Init 0 */
@@ -262,8 +255,8 @@ static void MX_TIM2_Init(void)
   htim2.Init.Period = 65535;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-__HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC1);
-__HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC2);
+  __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC1);
+  __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC2);
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
@@ -298,21 +291,21 @@ __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC2);
   }
   /* USER CODE BEGIN TIM2_Init 2 */
   __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
-  //HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_1);
-  //HAL_TIM_IC_Start(&htim2, TIM_CHANNEL_2);
-TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_1, TIM_CCx_ENABLE);
-TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_2, TIM_CCx_ENABLE);
+
+  TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_1, TIM_CCx_ENABLE);
+  TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_2, TIM_CCx_ENABLE);
 
   __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC1);
   __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_CC2);
+
   __HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC1);
   __HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_CC2);
+
   __HAL_TIM_ENABLE(&htim2);
+
   HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(TIM2_IRQn);
-
   /* USER CODE END TIM2_Init 2 */
-
 }
 
 /**
@@ -322,7 +315,6 @@ TIM_CCxChannelCmd(htim2.Instance, TIM_CHANNEL_2, TIM_CCx_ENABLE);
   */
 static void MX_USART1_UART_Init(void)
 {
-
   /* USER CODE BEGIN USART1_Init 0 */
 
   /* USER CODE END USART1_Init 0 */
@@ -346,15 +338,13 @@ static void MX_USART1_UART_Init(void)
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_ERR);
   /* USER CODE END USART1_Init 2 */
-
 }
 
-/** 
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void) 
 {
-
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
 
@@ -362,7 +352,6 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-
 }
 
 /**
@@ -388,7 +377,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
-
 }
 
 /* USER CODE BEGIN 4 */
@@ -416,7 +404,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
