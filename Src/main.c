@@ -41,7 +41,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define ADC_CHANNELS 2
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -108,7 +108,9 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  adc_init(&hadc1);
+  if (!adc_init(&hadc1, ADC_CHANNELS))
+    Error_Handler(); 
+
    usb_printf("DMX receiver started\r\n");
   /* USER CODE END 2 */
  
@@ -120,10 +122,16 @@ int main(void)
   {
     /* USER CODE END WHILE */
 	uint16_t len;
+	uint16_t adc[ADC_CHANNELS];
+	uint8_t adc_error;
 
 	len = dmx_receive(packet);
 
-	usb_dumppacket(packet, len);
+	//usb_dumppacket(packet, len);
+
+	adc_get(adc, &adc_error);
+	usb_printf("DMX.Len=%d ADC1=%d ADC2=%d ADC_Error=%d\r\n",
+		   len, adc[0], adc[1], adc_error);
 
 
     /* USER CODE BEGIN 3 */
