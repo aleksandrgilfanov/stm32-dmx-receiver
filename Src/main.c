@@ -22,6 +22,7 @@
 #include "main.h"
 #include "adc.h"
 #include "dmx_receiver.h"
+#include "led.h"
 #include "usb_debug.h"
 #include "usb_device.h"
 
@@ -121,6 +122,9 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   if (!adc_init(&hadc1, ADC_CHANNELS, process_adc))
+    Error_Handler();
+
+  if (!led_init(&htim4));
     Error_Handler();
 
   usb_printf("DMX receiver started\r\n");

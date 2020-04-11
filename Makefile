@@ -39,6 +39,7 @@ C_SOURCES =  \
 Src/main.c \
 Src/adc.c \
 Src/dmx_receiver.c \
+Src/led.c \
 Src/usb_debug.c \
 Src/stm32f1xx_it.c \
 Src/stm32f1xx_hal_msp.c \
