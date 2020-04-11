@@ -139,6 +139,9 @@ int main(void)
 
     len = dmx_receive(packet);
 
+    led_set(0, adc[0]);
+    led_set(1, adc[1]);
+
     if ((adc[0] < ADC_MAX) && (adc[1] < ADC_MAX))
         usb_dumppacket(packet, len);
     else
