@@ -42,6 +42,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define ADC_CHANNELS 2
+#define ADC_MAX	     500
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -70,6 +71,15 @@ static void MX_ADC1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 static uint8_t packet[576];
+static uint16_t adc[ADC_CHANNELS];
+
+static void process_adc(uint16_t *data)
+{
+	uint8_t ch;
+
+	for (ch = 0; ch < ADC_CHANNELS; ch++)
+		adc[ch] = data[ch];
+}
 
 /* USER CODE END 0 */
 
@@ -108,7 +118,7 @@ int main(void)
   MX_ADC1_Init();
 
   /* USER CODE BEGIN 2 */
-  if (!adc_init(&hadc1, ADC_CHANNELS))
+  if (!adc_init(&hadc1, ADC_CHANNELS, process_adc))
     Error_Handler();
 
   usb_printf("DMX receiver started\r\n");
@@ -120,16 +130,14 @@ int main(void)
   {
     /* USER CODE END WHILE */
     uint16_t len;
-    uint16_t adc[ADC_CHANNELS];
-    uint8_t adc_error;
 
     len = dmx_receive(packet);
 
-    //usb_dumppacket(packet, len);
-
-    adc_get(adc, &adc_error);
-    usb_printf("DMX.Len=%d ADC1=%d ADC2=%d ADC_Error=%d\r\n",
-                len, adc[0], adc[1], adc_error);
+    if ((adc[0] < ADC_MAX) && (adc[1] < ADC_MAX))
+        usb_dumppacket(packet, len);
+    else
+        usb_printf("DMX.Len=%d ADC1=%d ADC2=%d\r\n",
+                   len, adc[0], adc[1]);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
