@@ -38,6 +38,7 @@ BUILD_DIR = build
 C_SOURCES =  \
 Src/main.c \
 Src/adc.c \
+Src/core.c \
 Src/dmx_receiver.c \
 Src/led.c \
 Src/usb_debug.c \

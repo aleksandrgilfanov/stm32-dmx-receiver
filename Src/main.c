@@ -20,10 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "adc.h"
-#include "dmx_receiver.h"
-#include "led.h"
-#include "usb_debug.h"
+#include "core.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -42,8 +39,6 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define ADC_CHANNELS 2
-#define ADC_MAX	     500
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -73,16 +68,6 @@ static void MX_TIM4_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static uint8_t packet[576];
-static uint16_t adc[ADC_CHANNELS];
-
-static void process_adc(uint16_t *data)
-{
-	uint8_t ch;
-
-	for (ch = 0; ch < ADC_CHANNELS; ch++)
-		adc[ch] = data[ch];
-}
 
 /* USER CODE END 0 */
 
@@ -121,13 +106,8 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  if (!adc_init(&hadc1, ADC_CHANNELS, process_adc))
+  if (!core_init())
     Error_Handler();
-
-  if (!led_init(&htim4));
-    Error_Handler();
-
-  usb_printf("DMX receiver started\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -135,18 +115,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    uint16_t len;
-
-    len = dmx_receive(packet);
-
-    led_set(0, adc[0]);
-    led_set(1, adc[1]);
-
-    if ((adc[0] < ADC_MAX) && (adc[1] < ADC_MAX))
-        usb_dumppacket(packet, len);
-    else
-        usb_printf("DMX.Len=%d ADC1=%d ADC2=%d\r\n",
-                   len, adc[0], adc[1]);
+    core_process();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
