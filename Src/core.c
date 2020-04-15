@@ -3,6 +3,7 @@
 #include "main.h"
 
 #include "core.h"
+#include "curve.h"
 #include "adc.h"
 #include "dmx_receiver.h"
 #include "led.h"
@@ -46,8 +47,8 @@ void core_process(void)
 
 	len = dmx_receive(packet);
 
-	led_set(0, adc[0]);
-	led_set(1, adc[1]);
+	led_set(0, curve_fn(packet[1]));
+	led_set(1, curve_fn(packet[2]));
 
 	if ((adc[0] < ADC_MAX) && (adc[1] < ADC_MAX))
 		usb_dumppacket(packet, len);

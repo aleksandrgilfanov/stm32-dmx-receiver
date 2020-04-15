@@ -1,0 +1,25 @@
+#!/usr/bin/python3
+
+n = 256
+y_max = 999
+
+def y_fn(x_val):
+	return round(x_val * y_max / (n - 1))
+
+result = ""
+
+for x_val in range(0, n):
+	y_val = y_fn(x_val)
+	result += str(y_val)
+
+	if x_val < n - 1:
+		result += ","
+	else:
+		break
+
+	if (x_val == 0) or (x_val % 16 > 0):
+		result += " "
+	else:
+		result += "\n"
+
+print(result)

@@ -7,7 +7,7 @@ void led_set(uint8_t led, uint16_t value)
 	TIM_OC_InitTypeDef sConfigOC;
 
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = value*999/2100;
+	sConfigOC.Pulse = value;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 
